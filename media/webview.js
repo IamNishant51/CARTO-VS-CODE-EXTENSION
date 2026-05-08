@@ -57,11 +57,22 @@
 
   // ─── View Management ──────────────────────────────────────────────────────
 
+  var previousView = "v0";
+
   function showView(name) {
     ["v0","v1","v2","v3","v4"].forEach(function(id) {
       var el = document.getElementById(id);
       if (el) el.className = (name === id) ? "" : "h";
     });
+  }
+
+  function openSettings() {
+    // Remember which view we're coming from so Back can return to it
+    ["v0","v1","v2","v3"].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && el.className !== "h" && !el.classList.contains("h")) previousView = id;
+    });
+    showView("v4");
   }
 
   // ─── AI Toggle ────────────────────────────────────────────────────────────
@@ -110,13 +121,13 @@
     // Try again
     document.getElementById("rt").onclick = function() { showView("v0"); };
 
-    // Gear → settings
+    // Gear → settings (remembers current view)
     var gearBtn = document.getElementById("gear");
-    if (gearBtn) gearBtn.onclick = function() { showView("v4"); };
+    if (gearBtn) gearBtn.onclick = function() { openSettings(); };
 
-    // Back from settings
+    // Back from settings → return to previous view
     var btnCloseSettings = document.getElementById("bk-settings");
-    if (btnCloseSettings) btnCloseSettings.onclick = function() { showView("v0"); };
+    if (btnCloseSettings) btnCloseSettings.onclick = function() { showView(previousView); };
 
     // Enter key in settings saves
     ["set-gemini","set-openai","set-groq","set-ollama"].forEach(function(id) {
