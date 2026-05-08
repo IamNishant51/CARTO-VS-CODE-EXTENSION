@@ -15,6 +15,33 @@
 
   var vscodeApi = acquireVsCodeApi();
 
+  var previewOpen = false;
+
+  function updatePreview() {
+    var contentEl = document.getElementById("preview-content");
+    var badgeEl = document.getElementById("preview-badge");
+    if (!contentEl) return;
+    try {
+      contentEl.innerHTML = marked.parse(markdownContent);
+    } catch(e) {
+      contentEl.textContent = markdownContent;
+    }
+    if (badgeEl) {
+      // Count files: look for ``` blocks as a proxy for bundled file count
+      var fileCount = (markdownContent.match(/^```/gm) || []).length / 2;
+      badgeEl.textContent = Math.round(fileCount) + " files";
+    }
+  }
+
+  function setPreviewOpen(open) {
+    previewOpen = open;
+    var body = document.getElementById("preview-body");
+    var chevron = document.getElementById("preview-chevron");
+    if (body) body.className = open ? "preview-body open" : "preview-body";
+    if (chevron) chevron.className = open ? "preview-chevron open" : "preview-chevron";
+    if (open) updatePreview();
+  }
+
   function showView(name) {
     document.getElementById("v0").className = (name === "v0") ? "" : "h";
     document.getElementById("v1").className = (name === "v1") ? "" : "h";
@@ -102,6 +129,12 @@
       };
     }
 
+    // Preview panel toggle
+    var previewToggleBtn = document.getElementById("preview-toggle");
+    if (previewToggleBtn) {
+      previewToggleBtn.onclick = function() { setPreviewOpen(!previewOpen); };
+    }
+
     // Use AI toggle
     var aiToggle = document.getElementById("ai-toggle");
     if (aiToggle) {
@@ -146,6 +179,8 @@
         if (data.view === "loading") showView("v1");
         if (data.view === "results") {
           markdownContent = data.data.markdown;
+          // Refresh preview if it's open
+          if (previewOpen) updatePreview();
           // If AI toggle is on, immediately trigger AI analysis on new results
           if (aiEnabled) {
             var statusEl = document.getElementById("ai-status");
@@ -181,6 +216,8 @@
         if (statusEl) { statusEl.style.display = "none"; }
         // Append AI analysis to markdown content
         markdownContent = markdownContent + "\n\n---\n## AI Analysis\n" + data.text;
+        // Refresh preview if open
+        if (previewOpen) updatePreview();
       } else if (data.type === "ai_error") {
         aiThinking = false;
         var statusEl = document.getElementById("ai-status");

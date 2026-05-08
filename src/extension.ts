@@ -268,6 +268,64 @@ function getHtml(jsContent: string, config: any, logoUri: vscode.Uri): string {
     .lt { text-align: center; color: var(--textdim); font-size: 14px; margin-top: 24px; font-weight: 500; animation: pulse 2s infinite; }
     @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
     .h { display: none !important; }
+
+    /* Preview Panel */
+    .preview-wrap {
+      margin-top: 16px; border-radius: var(--r);
+      border: 1px solid var(--border); overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    .preview-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; background: var(--surface); cursor: pointer;
+      user-select: none; transition: background 0.2s;
+    }
+    .preview-header:hover { background: var(--surfaceh); }
+    .preview-header-left { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: var(--text); }
+    .preview-header-left svg { color: var(--accent); }
+    .preview-chevron { transition: transform 0.3s; color: var(--textdim); }
+    .preview-chevron.open { transform: rotate(180deg); }
+    .preview-badge {
+      font-size: 10px; padding: 2px 8px; border-radius: 20px;
+      background: rgba(99,102,241,0.15); color: var(--accent);
+      border: 1px solid rgba(99,102,241,0.3); font-weight: 600;
+    }
+    .preview-body {
+      max-height: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1);
+    }
+    .preview-body.open { max-height: 70vh; overflow-y: auto; }
+    .preview-content {
+      padding: 20px; font-size: 13px; line-height: 1.7; color: var(--text);
+      border-top: 1px solid var(--border);
+    }
+    .preview-content h1 { font-size: 18px; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .preview-content h2 { font-size: 15px; margin: 20px 0 8px; color: var(--text); }
+    .preview-content h3 { font-size: 13px; margin: 16px 0 6px; color: var(--textdim); }
+    .preview-content p { margin-bottom: 12px; color: #cbd5e1; }
+    .preview-content pre {
+      background: rgba(0,0,0,0.4); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px; overflow-x: auto;
+      margin-bottom: 16px; position: relative;
+    }
+    .preview-content code {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 11.5px; color: #a5b4fc;
+    }
+    .preview-content pre code { color: #e2e8f0; display: block; }
+    .preview-content ul, .preview-content ol { padding-left: 20px; margin-bottom: 12px; color: #cbd5e1; }
+    .preview-content li { margin-bottom: 4px; }
+    .preview-content blockquote {
+      border-left: 3px solid var(--accent); padding-left: 12px;
+      color: var(--textdim); margin-bottom: 12px; font-style: italic;
+    }
+    .preview-content hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+    .preview-content strong { color: var(--text); font-weight: 600; }
+    .preview-content a { color: var(--accent); text-decoration: none; }
+    .preview-content a:hover { text-decoration: underline; }
+    .preview-content table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
+    .preview-content th, .preview-content td { padding: 8px 12px; border: 1px solid var(--border); text-align: left; }
+    .preview-content th { background: rgba(99,102,241,0.1); color: var(--accent); font-weight: 600; }
+    
   </style>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -320,6 +378,21 @@ function getHtml(jsContent: string, config: any, logoUri: vscode.Uri): string {
       <div class="ac">
         <button id="cp">Copy to Clipboard</button>
         <button class="p" id="sv">Save as Markdown</button>
+      </div>
+
+      <!-- Preview Panel -->
+      <div class="preview-wrap glass" id="preview-wrap">
+        <div class="preview-header" id="preview-toggle">
+          <div class="preview-header-left">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            Preview Output
+            <span class="preview-badge" id="preview-badge">0 files</span>
+          </div>
+          <svg class="preview-chevron" id="preview-chevron" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="preview-body" id="preview-body">
+          <div class="preview-content" id="preview-content"></div>
+        </div>
       </div>
     </div>
     <div id="v3" class="h">
