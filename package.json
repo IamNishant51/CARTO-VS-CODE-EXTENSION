@@ -1,0 +1,89 @@
+{
+  "name": "carto",
+  "displayName": "Carto",
+  "description": "AI-powered project context bundler",
+  "version": "1.0.0",
+  "publisher": "carto-dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/carto-dev/carto"
+  },
+  "bugs": {
+    "url": "https://github.com/carto-dev/carto/issues"
+  },
+  "license": "MIT",
+  "engines": { "vscode": "^1.118.0" },
+  "categories": ["Other", "AI"],
+  "icon": "./media/logo.svg",
+  "activationEvents": ["onView:carto-main", "onCommand:carto.toggle"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "carto-view",
+          "title": "Carto",
+          "icon": "./media/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "carto-view": [
+        {
+          "id": "carto-main",
+          "name": "Bundler",
+          "type": "webview",
+          "icon": "./media/sidebar-icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "carto.toggle",
+        "title": "Carto: Toggle Dashboard"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "carto.toggle",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c"
+      }
+    ],
+    "configuration": {
+      "title": "Carto AI Settings",
+      "properties": {
+        "carto.aiProvider": {
+          "type": "string",
+          "enum": ["gemini", "openai", "groq", "ollama"],
+          "default": "gemini",
+          "description": "Select your preferred AI provider"
+        },
+        "carto.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API Key"
+        },
+        "carto.geminiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Google Gemini API Key"
+        },
+        "carto.groqApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Groq API Key"
+        },
+        "carto.ollamaEndpoint": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama API Endpoint"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  }
+}
