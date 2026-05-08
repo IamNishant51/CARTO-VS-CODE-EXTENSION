@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="media/logo.svg" alt="Carto Logo" width="150" height="150" />
+  <img src="media/logo.png" alt="Carto Logo" width="150" height="150" />
   
 # Carto AI Bundler
 

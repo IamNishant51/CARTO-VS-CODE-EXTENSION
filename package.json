@@ -3,18 +3,29 @@
   "displayName": "Carto",
   "description": "AI-powered project context bundler",
   "version": "1.0.0",
-  "publisher": "carto-dev",
+  "publisher": "IamNishant51",
+  "author": "Nishant",
   "repository": {
     "type": "git",
-    "url": "https://github.com/carto-dev/carto"
+    "url": "https://github.com/IamNishant51/CARTO-VS-CODE-EXTENSION"
   },
   "bugs": {
-    "url": "https://github.com/carto-dev/carto/issues"
+    "url": "https://github.com/IamNishant51/CARTO-VS-CODE-EXTENSION/issues"
   },
   "license": "MIT",
+  "keywords": [
+    "ai",
+    "bundler",
+    "context",
+    "gemini",
+    "openai",
+    "groq",
+    "ollama",
+    "assistant"
+  ],
   "engines": { "vscode": "^1.118.0" },
   "categories": ["Other", "AI"],
-  "icon": "./media/logo.svg",
+  "icon": "./media/logo.png",
   "activationEvents": ["onView:carto-main", "onCommand:carto.toggle"],
   "main": "./out/extension.js",
   "contributes": {
