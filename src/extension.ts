@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { bundleWorkspace } from './core/bundler';
-import { parseTechStack, generateMarkdown } from './core/markdown';
+import { parseTechStack, generateMarkdown, buildSmartAIContext } from './core/markdown';
 import * as fs from 'fs';
 import * as path from 'path';
 import { askAI } from './core/ai';
@@ -71,9 +71,11 @@ class CartoViewProvider {
         try {
           const aiProvider = vscode.workspace.getConfiguration('carto').get('aiProvider', 'gemini') as string;
           webview.webview.postMessage({ type: 'ai_thinking' });
+          // Use the pre-built smart context (compact) rather than the full markdown
+          // This reduces API tokens by ~90% and avoids rate limits
           const response = await askAI(
-            'Analyze this codebase. Write a concise, expert-level technical summary covering: architecture overview, key components, tech stack, data flow, and any notable patterns or concerns. Format your response in Markdown.',
-            msg.context,
+            'You are an expert software architect. Analyze this codebase thoroughly. Write a detailed, expert-level technical summary covering:\n1. Architecture overview and design patterns\n2. Key components and their responsibilities\n3. Tech stack and why it was chosen\n4. Data flow and key interactions\n5. Notable patterns, potential bugs, or improvement areas\n6. How to get started with this codebase\n\nFormat your response in clean, readable Markdown.',
+            msg.smartContext,
             aiProvider
           );
           webview.webview.postMessage({ type: 'ai_appended', text: response });
@@ -102,12 +104,15 @@ class CartoViewProvider {
     try {
       const exts = filters.filter((f: any) => f.enabled).flatMap((f: any) => f.extensions);
       const result = await bundleWorkspace(ws, { includeExtensions: exts.length ? exts : undefined, skipSensitive: true }, () => {});
-      const mk = generateMarkdown(result, {}, await parseTechStack(ws));
+      const techStack = await parseTechStack(ws);
+      const mk = generateMarkdown(result, {}, techStack);
+      const smartContext = buildSmartAIContext(result, techStack);
       webview.webview.postMessage({
         type: 'showView',
         view: 'results',
         data: {
           markdown: mk.content,
+          smartContext,
           summary: result.summary,
           tree: result.tree,
           security: result.securityScan
@@ -269,62 +274,121 @@ function getHtml(jsContent: string, config: any, logoUri: vscode.Uri): string {
     @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
     .h { display: none !important; }
 
-    /* Preview Panel */
+
+    /* ── Preview Panel ─────────────────────────────────────────────────── */
     .preview-wrap {
-      margin-top: 16px; border-radius: var(--r);
-      border: 1px solid var(--border); overflow: hidden;
-      transition: all 0.3s ease;
+      margin-top: 16px; border-radius: var(--r); overflow: hidden;
+      border: 1px solid rgba(99,102,241,0.2);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.4);
     }
     .preview-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 16px; background: var(--surface); cursor: pointer;
-      user-select: none; transition: background 0.2s;
+      padding: 14px 18px;
+      background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(168,85,247,0.05) 100%);
+      cursor: pointer; user-select: none;
+      transition: background 0.2s; border-bottom: 1px solid transparent;
     }
-    .preview-header:hover { background: var(--surfaceh); }
-    .preview-header-left { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: var(--text); }
-    .preview-header-left svg { color: var(--accent); }
-    .preview-chevron { transition: transform 0.3s; color: var(--textdim); }
+    .preview-header:hover {
+      background: linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(168,85,247,0.1) 100%);
+    }
+    .preview-body.open + * .preview-header,
+    .preview-header[aria-expanded="true"] { border-bottom-color: rgba(99,102,241,0.2); }
+    .preview-header-left { display: flex; align-items: center; gap: 10px; }
+    .preview-header-title { font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: 0.3px; }
+    .preview-header-left svg { color: #818cf8; flex-shrink: 0; }
+    .preview-chevron { transition: transform 0.35s cubic-bezier(0.4,0,0.2,1); color: var(--textdim); flex-shrink: 0; }
     .preview-chevron.open { transform: rotate(180deg); }
     .preview-badge {
-      font-size: 10px; padding: 2px 8px; border-radius: 20px;
-      background: rgba(99,102,241,0.15); color: var(--accent);
-      border: 1px solid rgba(99,102,241,0.3); font-weight: 600;
+      font-size: 10px; padding: 3px 9px; border-radius: 20px; font-weight: 700;
+      background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.2));
+      color: #a5b4fc; border: 1px solid rgba(99,102,241,0.35); letter-spacing: 0.3px;
     }
     .preview-body {
-      max-height: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1);
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.45s cubic-bezier(0.4,0,0.2,1);
     }
-    .preview-body.open { max-height: 70vh; overflow-y: auto; }
+    .preview-body.open { max-height: 72vh; overflow-y: auto; }
+    .preview-body.open::-webkit-scrollbar { width: 6px; }
+    .preview-body.open::-webkit-scrollbar-track { background: transparent; }
+    .preview-body.open::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 3px; }
+    .preview-body.open::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.5); }
+
+    /* Rendered Markdown Content */
     .preview-content {
-      padding: 20px; font-size: 13px; line-height: 1.7; color: var(--text);
-      border-top: 1px solid var(--border);
+      padding: 24px 20px; font-size: 13px; line-height: 1.75; color: #e2e8f0;
+      background: rgba(0,0,0,0.2);
     }
-    .preview-content h1 { font-size: 18px; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-    .preview-content h2 { font-size: 15px; margin: 20px 0 8px; color: var(--text); }
-    .preview-content h3 { font-size: 13px; margin: 16px 0 6px; color: var(--textdim); }
+    .preview-content h1 {
+      font-size: 19px; font-weight: 800; margin: 0 0 16px;
+      padding-bottom: 12px; border-bottom: 2px solid rgba(99,102,241,0.3);
+      background: linear-gradient(135deg, #e2e8f0, #a5b4fc);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .preview-content h2 {
+      font-size: 15px; font-weight: 700; margin: 28px 0 10px;
+      color: #c7d2fe; display: flex; align-items: center; gap: 8px;
+    }
+    .preview-content h2::before {
+      content: ''; display: inline-block; width: 3px; height: 16px;
+      background: var(--accent-gradient); border-radius: 2px; flex-shrink: 0;
+    }
+    .preview-content h3 {
+      font-size: 12px; font-weight: 600; margin: 20px 0 6px;
+      color: #94a3b8; text-transform: uppercase; letter-spacing: 0.7px;
+      padding: 8px 12px; background: rgba(99,102,241,0.06);
+      border-left: 2px solid rgba(99,102,241,0.4); border-radius: 0 4px 4px 0;
+    }
     .preview-content p { margin-bottom: 12px; color: #cbd5e1; }
     .preview-content pre {
-      background: rgba(0,0,0,0.4); border: 1px solid var(--border);
-      border-radius: 8px; padding: 14px; overflow-x: auto;
-      margin-bottom: 16px; position: relative;
+      background: #0d0f1a; border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 10px; padding: 0; overflow: hidden;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03);
+      position: relative;
+    }
+    .preview-content pre code {
+      display: block; padding: 16px 18px;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 11.5px; line-height: 1.65; color: #e2e8f0;
+      overflow-x: auto;
+    }
+    .preview-content pre code::-webkit-scrollbar { height: 4px; }
+    .preview-content pre code::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.4); border-radius: 2px; }
+    .code-lang-label {
+      display: block; padding: 5px 14px; font-size: 10px; font-weight: 700;
+      color: #6366f1; background: rgba(99,102,241,0.1);
+      border-bottom: 1px solid rgba(99,102,241,0.15); letter-spacing: 0.8px;
+      text-transform: uppercase; font-family: 'JetBrains Mono', monospace;
     }
     .preview-content code {
       font-family: 'JetBrains Mono', 'Fira Code', monospace;
       font-size: 11.5px; color: #a5b4fc;
+      background: rgba(99,102,241,0.12); padding: 2px 6px; border-radius: 4px;
+      border: 1px solid rgba(99,102,241,0.2);
     }
-    .preview-content pre code { color: #e2e8f0; display: block; }
-    .preview-content ul, .preview-content ol { padding-left: 20px; margin-bottom: 12px; color: #cbd5e1; }
-    .preview-content li { margin-bottom: 4px; }
+    .preview-content pre code { background: none; border: none; padding: 0; border-radius: 0; }
+    .preview-content ul, .preview-content ol { padding-left: 22px; margin-bottom: 14px; color: #cbd5e1; }
+    .preview-content li { margin-bottom: 5px; }
+    .preview-content li::marker { color: #6366f1; }
     .preview-content blockquote {
-      border-left: 3px solid var(--accent); padding-left: 12px;
-      color: var(--textdim); margin-bottom: 12px; font-style: italic;
+      border-left: 3px solid #6366f1; padding: 10px 14px;
+      background: rgba(99,102,241,0.06); border-radius: 0 8px 8px 0;
+      color: #94a3b8; margin-bottom: 14px; font-style: italic;
     }
-    .preview-content hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
-    .preview-content strong { color: var(--text); font-weight: 600; }
-    .preview-content a { color: var(--accent); text-decoration: none; }
-    .preview-content a:hover { text-decoration: underline; }
-    .preview-content table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
-    .preview-content th, .preview-content td { padding: 8px 12px; border: 1px solid var(--border); text-align: left; }
-    .preview-content th { background: rgba(99,102,241,0.1); color: var(--accent); font-weight: 600; }
+    .preview-content hr {
+      border: none; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(99,102,241,0.4), transparent);
+      margin: 24px 0;
+    }
+    .preview-content strong { color: #e2e8f0; font-weight: 700; }
+    .preview-content em { color: #a5b4fc; }
+    .preview-content a { color: #818cf8; text-decoration: none; border-bottom: 1px solid rgba(129,140,248,0.3); }
+    .preview-content a:hover { color: #a5b4fc; border-bottom-color: #a5b4fc; }
+    .preview-content table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12px; border-radius: 8px; overflow: hidden; }
+    .preview-content th { padding: 10px 14px; background: rgba(99,102,241,0.15); color: #a5b4fc; font-weight: 700; text-align: left; border-bottom: 2px solid rgba(99,102,241,0.3); }
+    .preview-content td { padding: 9px 14px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #cbd5e1; }
+    .preview-content tr:last-child td { border-bottom: none; }
+    .preview-content tr:hover td { background: rgba(99,102,241,0.04); }
     
   </style>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -381,11 +445,11 @@ function getHtml(jsContent: string, config: any, logoUri: vscode.Uri): string {
       </div>
 
       <!-- Preview Panel -->
-      <div class="preview-wrap glass" id="preview-wrap">
-        <div class="preview-header" id="preview-toggle">
+      <div class="preview-wrap" id="preview-wrap">
+        <div class="preview-header" id="preview-toggle" aria-expanded="false">
           <div class="preview-header-left">
             <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-            Preview Output
+            <span class="preview-header-title">Preview Output</span>
             <span class="preview-badge" id="preview-badge">0 files</span>
           </div>
           <svg class="preview-chevron" id="preview-chevron" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
