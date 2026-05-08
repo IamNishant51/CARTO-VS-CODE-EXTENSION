@@ -95,11 +95,12 @@ class CartoViewProvider {
                     vscode.window.showInformationMessage('Saved');
                 }
             }
-            if (msg.type === 'ask_ai') {
+            if (msg.type === 'use_ai') {
                 try {
-                    const provider = msg.provider || vscode.workspace.getConfiguration('carto').get('aiProvider', 'gemini');
-                    const response = await (0, ai_1.askAI)(msg.prompt, msg.context, provider);
-                    webview.webview.postMessage({ type: 'ai_response', text: response });
+                    const aiProvider = vscode.workspace.getConfiguration('carto').get('aiProvider', 'gemini');
+                    webview.webview.postMessage({ type: 'ai_thinking' });
+                    const response = await (0, ai_1.askAI)('Analyze this codebase. Write a concise, expert-level technical summary covering: architecture overview, key components, tech stack, data flow, and any notable patterns or concerns. Format your response in Markdown.', msg.context, aiProvider);
+                    webview.webview.postMessage({ type: 'ai_appended', text: response });
                 }
                 catch (e) {
                     webview.webview.postMessage({ type: 'ai_error', error: e.message || String(e) });
@@ -108,9 +109,12 @@ class CartoViewProvider {
             if (msg.type === 'save_settings') {
                 const config = vscode.workspace.getConfiguration('carto');
                 await config.update('aiProvider', msg.data.provider, vscode.ConfigurationTarget.Global);
-                await config.update('geminiApiKey', msg.data.gemini, vscode.ConfigurationTarget.Global);
-                await config.update('openaiApiKey', msg.data.openai, vscode.ConfigurationTarget.Global);
-                await config.update('groqApiKey', msg.data.groq, vscode.ConfigurationTarget.Global);
+                if (msg.data.gemini !== null)
+                    await config.update('geminiApiKey', msg.data.gemini, vscode.ConfigurationTarget.Global);
+                if (msg.data.openai !== null)
+                    await config.update('openaiApiKey', msg.data.openai, vscode.ConfigurationTarget.Global);
+                if (msg.data.groq !== null)
+                    await config.update('groqApiKey', msg.data.groq, vscode.ConfigurationTarget.Global);
                 await config.update('ollamaEndpoint', msg.data.ollama, vscode.ConfigurationTarget.Global);
                 vscode.window.showInformationMessage('Carto AI Settings saved!');
             }
@@ -328,13 +332,16 @@ function getHtml(jsContent, config, logoUri) {
       <div class="ba suc glass" id="ba"><span>✓ No sensitive files</span></div>
       <div class="tr" id="tv"></div>
       
-      <div class="glass" style="margin-top: 24px; padding: 16px; border-radius: var(--r);">
-        <h2 style="font-size: 11px; margin-bottom: 12px; color: var(--textdim); text-transform: uppercase; font-weight: 600;">Ask AI about this codebase</h2>
-
-        <textarea id="ai-prompt" class="ai-ta glass" placeholder="What does this project do?..." style="width: 100%; height: 80px; padding: 12px; resize: vertical; margin-bottom: 12px;"></textarea>
-        <button class="b" id="ai-send" style="padding: 10px 16px; font-size: 13px;">Ask AI</button>
-        <div id="ai-response" class="tr" style="margin-top: 12px; display: none; white-space: pre-wrap; line-height: 1.5;"></div>
+      <div class="glass" style="margin-top: 24px; padding: 14px 16px; border-radius: var(--r); display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div style="font-size: 13px; font-weight: 600; color: var(--text);">Use AI</div>
+          <div style="font-size: 11px; color: var(--textdim); margin-top: 2px;">Append AI analysis to output</div>
+        </div>
+        <div id="ai-toggle" style="width: 44px; height: 24px; border-radius: 12px; background: var(--border); cursor: pointer; position: relative; transition: background 0.3s; flex-shrink: 0;">
+          <div id="ai-toggle-knob" style="position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--textdim); transition: all 0.3s;"></div>
+        </div>
       </div>
+      <div id="ai-status" style="display:none; margin-top: 8px; font-size: 12px; color: var(--textdim); text-align: center; animation: pulse 2s infinite;">AI is analyzing...</div>
 
       <div class="ac">
         <button id="cp">Copy to Clipboard</button>
@@ -360,13 +367,13 @@ function getHtml(jsContent, config, logoUri) {
         </select>
         
         <label style="display:block; margin-bottom: 4px; font-size: 11px; color: var(--textdim); text-transform: uppercase;">Gemini API Key</label>
-        <input type="password" id="set-gemini" value="${config.gemini}" class="ai-ta glass" style="width:100%; padding: 10px; margin-bottom: 16px; border-radius: 6px;">
+        <input type="password" id="set-gemini" placeholder="${config.gemini ? 'Key saved — enter to replace' : 'Enter Gemini API Key'}" class="ai-ta glass" style="width:100%; padding: 10px; margin-bottom: 16px; border-radius: 6px;">
         
         <label style="display:block; margin-bottom: 4px; font-size: 11px; color: var(--textdim); text-transform: uppercase;">OpenAI API Key</label>
-        <input type="password" id="set-openai" value="${config.openai}" class="ai-ta glass" style="width:100%; padding: 10px; margin-bottom: 16px; border-radius: 6px;">
+        <input type="password" id="set-openai" placeholder="${config.openai ? 'Key saved — enter to replace' : 'Enter OpenAI API Key'}" class="ai-ta glass" style="width:100%; padding: 10px; margin-bottom: 16px; border-radius: 6px;">
         
         <label style="display:block; margin-bottom: 4px; font-size: 11px; color: var(--textdim); text-transform: uppercase;">Groq API Key</label>
-        <input type="password" id="set-groq" value="${config.groq}" class="ai-ta glass" style="width:100%; padding: 10px; margin-bottom: 16px; border-radius: 6px;">
+        <input type="password" id="set-groq" placeholder="${config.groq ? 'Key saved — enter to replace' : 'Enter Groq API Key'}" class="ai-ta glass" style="width:100%; padding: 10px; margin-bottom: 16px; border-radius: 6px;">
         
         <label style="display:block; margin-bottom: 4px; font-size: 11px; color: var(--textdim); text-transform: uppercase;">Ollama Endpoint</label>
         <input type="text" id="set-ollama" value="${config.ollama}" class="ai-ta glass" style="width:100%; padding: 10px; margin-bottom: 24px; border-radius: 6px;" placeholder="http://localhost:11434">

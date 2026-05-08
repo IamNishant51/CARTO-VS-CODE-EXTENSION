@@ -10,8 +10,9 @@
     {id:"html",label:"HTML",extensions:[".html",".htm"],enabled:true}
   ];
   var markdownContent = "";
-  
-  // Try to acquire the API, this can only be done once per session
+  var aiEnabled = false;
+  var aiThinking = false;
+
   var vscodeApi = acquireVsCodeApi();
 
   function showView(name) {
@@ -21,6 +22,17 @@
     document.getElementById("v3").className = (name === "v3") ? "" : "h";
     var v4 = document.getElementById("v4");
     if (v4) v4.className = (name === "v4") ? "" : "h";
+  }
+
+  function setAIToggle(on) {
+    aiEnabled = on;
+    var toggle = document.getElementById("ai-toggle");
+    var knob = document.getElementById("ai-toggle-knob");
+    if (toggle && knob) {
+      toggle.style.background = on ? "var(--accent)" : "var(--border)";
+      knob.style.left = on ? "23px" : "3px";
+      knob.style.background = on ? "#fff" : "var(--textdim)";
+    }
   }
 
   function setup() {
@@ -43,51 +55,77 @@
     document.getElementById("rt").onclick = function() {
       showView("v0");
     };
-    
+
     var gearBtn = document.getElementById("gear");
     if (gearBtn) {
       gearBtn.onclick = function() { showView("v4"); };
     }
-    
+
     var btnCloseSettings = document.getElementById("bk-settings");
     if (btnCloseSettings) {
       btnCloseSettings.onclick = function() { showView("v0"); };
     }
 
+    // Enter key in settings panel saves settings
+    var settingsInputs = ["set-gemini", "set-openai", "set-groq", "set-ollama"];
+    settingsInputs.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener("keydown", function(e) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            document.getElementById("sv-settings").click();
+          }
+        });
+      }
+    });
+
     var btnSaveSettings = document.getElementById("sv-settings");
     if (btnSaveSettings) {
       btnSaveSettings.onclick = function() {
+        var geminiVal = document.getElementById("set-gemini").value;
+        var openaiVal = document.getElementById("set-openai").value;
+        var groqVal = document.getElementById("set-groq").value;
+        var ollamaVal = document.getElementById("set-ollama").value;
+        // Only send a key if the user actually typed something; empty = keep existing
         vscodeApi.postMessage({
           type: "save_settings",
           data: {
             provider: document.getElementById("set-provider").value,
-            gemini: document.getElementById("set-gemini").value,
-            openai: document.getElementById("set-openai").value,
-            groq: document.getElementById("set-groq").value,
-            ollama: document.getElementById("set-ollama").value
+            gemini: geminiVal || null,
+            openai: openaiVal || null,
+            groq: groqVal || null,
+            ollama: ollamaVal
           }
         });
         showView("v0");
       };
     }
 
-    var aiBtn = document.getElementById("ai-send");
-    if (aiBtn) {
-      aiBtn.onclick = function() {
-        var prompt = document.getElementById("ai-prompt").value;
-        if (!prompt || !prompt.trim()) return;
-        
-        document.getElementById("ai-response").style.display = "block";
-        document.getElementById("ai-response").innerHTML = "<div class='lt' style='margin-top:0'>AI is thinking...</div>";
-        aiBtn.disabled = true;
-        aiBtn.style.opacity = "0.5";
-        
-        vscodeApi.postMessage({
-          type: "ask_ai", 
-          prompt: prompt, 
-          provider: document.getElementById("set-provider").value,
-          context: markdownContent 
-        });
+    // Use AI toggle
+    var aiToggle = document.getElementById("ai-toggle");
+    if (aiToggle) {
+      aiToggle.onclick = function() {
+        if (aiThinking) return; // don't allow toggling while AI is running
+        setAIToggle(!aiEnabled);
+
+        if (aiEnabled && markdownContent) {
+          // AI was just turned ON and we have content — trigger AI analysis
+          var statusEl = document.getElementById("ai-status");
+          if (statusEl) { statusEl.style.display = "block"; }
+          aiThinking = true;
+          vscodeApi.postMessage({
+            type: "use_ai",
+            context: markdownContent
+          });
+        } else if (!aiEnabled) {
+          // AI toggled OFF — strip any previously appended AI section from the content
+          var sep = "\n\n---\n## AI Analysis\n";
+          var idx = markdownContent.indexOf(sep);
+          if (idx !== -1) {
+            markdownContent = markdownContent.substring(0, idx);
+          }
+        }
       };
     }
 
@@ -108,6 +146,13 @@
         if (data.view === "loading") showView("v1");
         if (data.view === "results") {
           markdownContent = data.data.markdown;
+          // If AI toggle is on, immediately trigger AI analysis on new results
+          if (aiEnabled) {
+            var statusEl = document.getElementById("ai-status");
+            if (statusEl) { statusEl.style.display = "block"; }
+            aiThinking = true;
+            vscodeApi.postMessage({ type: "use_ai", context: markdownContent });
+          }
           showView("v2");
           document.getElementById("sf").textContent = data.data.summary.totalFiles;
           document.getElementById("sl").textContent = data.data.summary.totalLines;
@@ -128,18 +173,26 @@
           showView("v3");
           document.getElementById("er").innerHTML = "<span>" + data.error + "</span>";
         }
-      } else if (data.type === "ai_response") {
-        try {
-          document.getElementById("ai-response").innerHTML = marked.parse(data.text);
-        } catch(e) {
-          document.getElementById("ai-response").textContent = data.text;
-        }
-        var btn = document.getElementById("ai-send");
-        if (btn) { btn.disabled = false; btn.style.opacity = "1"; }
+      } else if (data.type === "ai_thinking") {
+        // Already showing status, nothing extra needed
+      } else if (data.type === "ai_appended") {
+        aiThinking = false;
+        var statusEl = document.getElementById("ai-status");
+        if (statusEl) { statusEl.style.display = "none"; }
+        // Append AI analysis to markdown content
+        markdownContent = markdownContent + "\n\n---\n## AI Analysis\n" + data.text;
       } else if (data.type === "ai_error") {
-        document.getElementById("ai-response").innerHTML = "<span style='color: var(--danger)'>" + data.error + "</span>";
-        var btn = document.getElementById("ai-send");
-        if (btn) { btn.disabled = false; btn.style.opacity = "1"; }
+        aiThinking = false;
+        var statusEl = document.getElementById("ai-status");
+        if (statusEl) {
+          statusEl.style.display = "block";
+          statusEl.style.color = "var(--danger)";
+          statusEl.textContent = "AI error: " + data.error;
+          statusEl.style.animation = "none";
+          setTimeout(function() { statusEl.style.display = "none"; statusEl.style.color = "var(--textdim)"; statusEl.style.animation = "pulse 2s infinite"; }, 4000);
+        }
+        // Turn off toggle on error
+        setAIToggle(false);
       }
     };
   }
