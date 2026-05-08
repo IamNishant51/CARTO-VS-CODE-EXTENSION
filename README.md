@@ -10,7 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
 <br>
-<img src="media/DEMO.gif" alt="Carto Demo" width="100%" />
+<video src="https://ik.imagekit.io/9pfz6g8ri/videos/export-1778250170892.mp4" autoplay loop muted playsinline width="100%"></video>
 </div>
 
 ---
