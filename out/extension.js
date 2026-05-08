@@ -55,7 +55,10 @@ class CartoViewProvider {
         this.context = context;
     }
     resolveWebviewView(webview) {
-        webview.webview.options = { enableScripts: true };
+        webview.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [this.context.extensionUri]
+        };
         webview.title = 'Bundler';
         // Load the external JS file
         const jsPath = path.join(this.context.extensionPath, 'media', 'webview.js');
@@ -64,61 +67,77 @@ class CartoViewProvider {
             jsContent = fs.readFileSync(jsPath, 'utf-8');
         }
         catch (e) {
-            console.error('Failed to load webview.js:', e);
-            jsContent = 'console.log("inline fallback");';
+            console.error('[Carto] Failed to load webview.js:', e);
+            jsContent = 'console.error("Carto: failed to load webview.js")';
         }
         const config = vscode.workspace.getConfiguration('carto');
         const aiConfig = {
             provider: config.get('aiProvider', 'gemini'),
-            gemini: config.get('geminiApiKey', ''),
-            openai: config.get('openaiApiKey', ''),
-            groq: config.get('groqApiKey', ''),
+            // NOTE: Never expose actual key values — only pass whether a key exists (boolean)
+            // Keys are read server-side only via vscode.workspace.getConfiguration at request time
+            gemini: !!(config.get('geminiApiKey', '')),
+            openai: !!(config.get('openaiApiKey', '')),
+            groq: !!(config.get('groqApiKey', '')),
             ollama: config.get('ollamaEndpoint', 'http://localhost:11434')
         };
-        const logoUri = webview.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'logo.svg'));
+        const logoUri = webview.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'logo.png'));
         webview.webview.html = getHtml(jsContent, aiConfig, logoUri);
         webview.webview.onDidReceiveMessage(async (msg) => {
-            if (msg.type === 'generate') {
-                await this.runBundle(msg.fileFilters, webview);
-            }
-            if (msg.type === 'copy') {
-                await vscode.env.clipboard.writeText(msg.content);
-                vscode.window.showInformationMessage('Copied');
-            }
-            if (msg.type === 'save') {
-                const uri = await vscode.window.showSaveDialog({
-                    defaultUri: vscode.Uri.file('project-' + new Date().toISOString().split('T')[0] + '.md'),
-                    filters: { Markdown: ['md'] }
-                });
-                if (uri) {
-                    await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(msg.content));
-                    vscode.window.showInformationMessage('Saved');
+            try {
+                switch (msg.type) {
+                    case 'generate':
+                        await this.runBundle(msg.fileFilters, webview);
+                        break;
+                    case 'copy':
+                        if (typeof msg.content === 'string') {
+                            await vscode.env.clipboard.writeText(msg.content);
+                            vscode.window.showInformationMessage('Copied to clipboard!');
+                        }
+                        break;
+                    case 'save':
+                        if (typeof msg.content === 'string') {
+                            const uri = await vscode.window.showSaveDialog({
+                                defaultUri: vscode.Uri.file(`carto-bundle-${new Date().toISOString().split('T')[0]}.md`),
+                                filters: { Markdown: ['md'] }
+                            });
+                            if (uri) {
+                                await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(msg.content));
+                                vscode.window.showInformationMessage('Bundle saved!');
+                            }
+                        }
+                        break;
+                    case 'use_ai': {
+                        const aiProvider = vscode.workspace.getConfiguration('carto').get('aiProvider', 'gemini');
+                        webview.webview.postMessage({ type: 'ai_thinking' });
+                        try {
+                            const response = await (0, ai_1.askAI)(ai_1.ANALYSIS_PROMPT, msg.smartContext ?? '', aiProvider);
+                            webview.webview.postMessage({ type: 'ai_appended', text: response });
+                        }
+                        catch (e) {
+                            webview.webview.postMessage({ type: 'ai_error', error: e.message || String(e) });
+                        }
+                        break;
+                    }
+                    case 'save_settings': {
+                        const cfg = vscode.workspace.getConfiguration('carto');
+                        const target = vscode.ConfigurationTarget.Global;
+                        if (msg.data?.provider)
+                            await cfg.update('aiProvider', msg.data.provider, target);
+                        if (msg.data?.gemini)
+                            await cfg.update('geminiApiKey', msg.data.gemini, target);
+                        if (msg.data?.openai)
+                            await cfg.update('openaiApiKey', msg.data.openai, target);
+                        if (msg.data?.groq)
+                            await cfg.update('groqApiKey', msg.data.groq, target);
+                        if (msg.data?.ollama !== undefined)
+                            await cfg.update('ollamaEndpoint', msg.data.ollama, target);
+                        vscode.window.showInformationMessage('Carto settings saved!');
+                        break;
+                    }
                 }
             }
-            if (msg.type === 'use_ai') {
-                try {
-                    const aiProvider = vscode.workspace.getConfiguration('carto').get('aiProvider', 'gemini');
-                    webview.webview.postMessage({ type: 'ai_thinking' });
-                    // Use the pre-built smart context (compact) rather than the full markdown
-                    // This reduces API tokens by ~90% and avoids rate limits
-                    const response = await (0, ai_1.askAI)('You are an expert software architect. Analyze this codebase thoroughly. Write a detailed, expert-level technical summary covering:\n1. Architecture overview and design patterns\n2. Key components and their responsibilities\n3. Tech stack and why it was chosen\n4. Data flow and key interactions\n5. Notable patterns, potential bugs, or improvement areas\n6. How to get started with this codebase\n\nFormat your response in clean, readable Markdown.', msg.smartContext, aiProvider);
-                    webview.webview.postMessage({ type: 'ai_appended', text: response });
-                }
-                catch (e) {
-                    webview.webview.postMessage({ type: 'ai_error', error: e.message || String(e) });
-                }
-            }
-            if (msg.type === 'save_settings') {
-                const config = vscode.workspace.getConfiguration('carto');
-                await config.update('aiProvider', msg.data.provider, vscode.ConfigurationTarget.Global);
-                if (msg.data.gemini !== null)
-                    await config.update('geminiApiKey', msg.data.gemini, vscode.ConfigurationTarget.Global);
-                if (msg.data.openai !== null)
-                    await config.update('openaiApiKey', msg.data.openai, vscode.ConfigurationTarget.Global);
-                if (msg.data.groq !== null)
-                    await config.update('groqApiKey', msg.data.groq, vscode.ConfigurationTarget.Global);
-                await config.update('ollamaEndpoint', msg.data.ollama, vscode.ConfigurationTarget.Global);
-                vscode.window.showInformationMessage('Carto AI Settings saved!');
+            catch (e) {
+                console.error('[Carto] Message handler error:', e);
             }
         });
     }
@@ -497,8 +516,8 @@ function getHtml(jsContent, config, logoUri) {
       <div class="glass" style="padding: 16px; border-radius: var(--r);">
         <label style="display:block; margin-bottom: 4px; font-size: 11px; color: var(--textdim); text-transform: uppercase;">AI Provider</label>
         <select id="set-provider" class="ai-sel glass" style="width:100%; margin-bottom: 16px; padding: 10px;">
-          <option value="gemini" ${config.provider === 'gemini' ? 'selected' : ''}>Gemini (gemini-1.5-pro)</option>
-          <option value="openai" ${config.provider === 'openai' ? 'selected' : ''}>OpenAI (gpt-4o)</option>
+          <option value="gemini" ${config.provider === 'gemini' ? 'selected' : ''}>Gemini (gemini-1.5-flash)</option>
+          <option value="openai" ${config.provider === 'openai' ? 'selected' : ''}>OpenAI (gpt-4o-mini)</option>
           <option value="groq" ${config.provider === 'groq' ? 'selected' : ''}>Groq (llama-3.3-70b-versatile)</option>
           <option value="ollama" ${config.provider === 'ollama' ? 'selected' : ''}>Ollama (llama3)</option>
         </select>

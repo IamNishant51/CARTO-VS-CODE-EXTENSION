@@ -1,21 +1,23 @@
 <div align="center">
-  <img src="media/logo.png" alt="Carto Logo" width="150" height="150" />
-  
-# Carto AI Bundler
+  <img src="media/logo.png" alt="Carto Logo" width="120" height="120" />
 
-> **A powerful, high-performance project context bundler for Visual Studio Code.**
+# Carto — AI Codebase Bundler
 
-[![Version](https://img.shields.io/visual-studio-marketplace/v/carto-dev.carto?color=blue&label=Version&style=flat-square)](#)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/carto-dev.carto?color=green&label=Installs&style=flat-square)](#)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+**Bundle your entire project into AI-ready context in one click.**
 
-<br>
-<video src="https://ik.imagekit.io/9pfz6g8ri/videos/export-1778250170892.mp4" autoplay loop muted playsinline width="100%"></video>
+[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/nishantunavane.carto?color=6366f1&label=Marketplace&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=nishantunavane.carto)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/nishantunavane.carto?color=10b981&label=Installs&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=nishantunavane.carto)
+[![License: MIT](https://img.shields.io/badge/License-MIT-f59e0b.svg?style=flat-square)](LICENSE)
+
 </div>
+
+![Carto Demo](https://ik.imagekit.io/9pfz6g8ri/videos/export-1778250170892.mp4/ik-thumbnail.jpg?tr=w-800)
+
+> Watch the full demo: [ik.imagekit.io/...](https://ik.imagekit.io/9pfz6g8ri/videos/export-1778250170892.mp4)
 
 ---
 
-Carto seamlessly gathers and organizes your codebase context, allowing you to easily analyze your projects using your preferred AI models. With support for multiple leading AI providers and a modern, polished user interface, Carto streamlines the process of feeding complex project data to AI assistants.
+Carto bundles your entire codebase into a single, beautifully structured Markdown file — ready to paste into any AI assistant. It works with multi-provider AI (Gemini, OpenAI, Groq, Ollama), detects your tech stack automatically, and runs entirely locally on your machine.
 
 ## Table of Contents
 - [Features](#features)
@@ -30,80 +32,85 @@ Carto seamlessly gathers and organizes your codebase context, allowing you to ea
 ## Features
 
 - **Multi-Provider AI Integration**  
-  Connect directly to leading AI models. Carto supports Google Gemini, OpenAI, Groq, and local models via Ollama.
-  
-- **Premium Glassmorphism Interface**  
-  Experience a highly polished, responsive dashboard built directly into Visual Studio Code, featuring a modern glassmorphism design.
-  
+  Supports Google Gemini, OpenAI (GPT-4o), Groq (Llama 3), and local models via Ollama.
+
 - **Intelligent Context Bundling**  
-  Quickly bundle your codebase for AI analysis without manually copying and pasting multiple files.
-  
-- **Persistent Configuration**  
-  Securely manage and persist your API keys and provider preferences. Your configuration is saved locally and reliably synchronized between the extension backend and the interactive dashboard.
-  
+  Bundles your codebase into a clean, navigable Markdown file with a table of contents, tech stack detection, directory tree, and full file contents grouped by folder.
+
+- **Use AI Toggle**  
+  Enable the AI toggle to automatically append a senior-engineer-level codebase analysis to your output — uses a smart compact context to minimize API token usage.
+
+- **Full Output Preview**  
+  Preview the entire bundled output with beautiful rendered markdown before saving — right inside the VS Code sidebar.
+
+- **Auto Tech Stack Detection**  
+  Detects ecosystem, dependencies, and scripts from `package.json`, `requirements.txt`, `go.mod`, `Cargo.toml`, `pom.xml`, `Gemfile`, `composer.json`, and more.
+
+- **Security Scanning**  
+  Automatically detects and excludes `.env`, private keys, credentials, and other sensitive files.
+
 - **Local AI Support**  
-  Use Ollama to analyze your codebase locally without sending sensitive data to external servers.
+  Use Ollama to run models entirely locally — no data leaves your machine.
 
 ---
 
 ## Installation
 
-1. Open **Visual Studio Code**.
-2. Navigate to the **Extensions** view (`Ctrl+Shift+X` or `Cmd+Shift+X` on macOS).
-3. Search for **"Carto"**.
-4. Click **Install**.
+1. Open **Visual Studio Code**
+2. Go to **Extensions** (`Ctrl+Shift+X`)
+3. Search for **Carto**
+4. Click **Install**
 
 ---
 
 ## Usage
 
-**1. Open the Dashboard**  
-You can open the Carto dashboard by clicking the Carto icon in the Activity Bar, or by using the keyboard shortcut:
-- **Windows / Linux**: `Ctrl+Shift+C`
-- **macOS**: `Cmd+Shift+C`
+**1. Open Carto**  
+Click the Carto icon in the Activity Bar, or press `Ctrl+Shift+C` (Windows/Linux) / `Cmd+Shift+C` (macOS).
 
-**2. Configure Your Provider**  
-In the dashboard or through VS Code settings, select your preferred AI provider (Gemini, OpenAI, Groq, or Ollama).
+**2. Configure AI (optional)**  
+Click the gear icon to open Settings. Select a provider and enter your API key. Keys are stored locally and never sent to Carto servers.
 
-**3. Set API Keys**  
-Enter your API key for the selected provider. If using Ollama, ensure your local endpoint is configured correctly.
+**3. Bundle**  
+Click **Bundle Project**. Carto scans your workspace, skipping `node_modules`, build artifacts, lock files, and sensitive files automatically.
 
-**4. Bundle and Analyze**  
-Use the intuitive interface to bundle your project context and interact with the chosen AI model.
+**4. Preview & Export**  
+View stats, the directory tree, and click **Preview Output** to see the full rendered bundle. Use **Copy to Clipboard** or **Save as Markdown** to export.
+
+**5. AI Analysis (optional)**  
+Toggle **Use AI** to append an expert technical analysis of your codebase to the output. The analysis covers architecture, tech stack, data flow, key components, and improvement suggestions.
 
 ---
 
 ## Configuration
 
-This extension contributes the following settings that can be configured in your `settings.json` or through the VS Code Settings UI:
-
-| Setting Key | Description | Default Value | Options |
-|-------------|-------------|---------------|---------|
-| `carto.aiProvider` | Select your preferred AI provider | `gemini` | `gemini`, `openai`, `groq`, `ollama` |
-| `carto.openaiApiKey` | Your OpenAI API Key | `""` | - |
-| `carto.geminiApiKey` | Your Google Gemini API Key | `""` | - |
-| `carto.groqApiKey` | Your Groq API Key | `""` | - |
-| `carto.ollamaEndpoint` | Endpoint URL for local Ollama | `http://localhost:11434` | - |
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `carto.aiProvider` | Active AI provider | `gemini` |
+| `carto.geminiApiKey` | Google Gemini API key | `""` |
+| `carto.openaiApiKey` | OpenAI API key | `""` |
+| `carto.groqApiKey` | Groq API key | `""` |
+| `carto.ollamaEndpoint` | Local Ollama endpoint | `http://localhost:11434` |
 
 ---
 
 ## Privacy and Security
 
-Carto respects your privacy and codebase security:
-- **Local Storage:** API keys are stored locally within your VS Code configuration and are never transmitted to any third-party servers other than the AI provider you explicitly select.
-- **Local Processing:** Source code bundling happens locally on your machine.
-- **Complete Privacy:** If you require complete data privacy, you can use the Ollama provider to run models entirely locally without an internet connection.
+- **Local Processing** — All bundling and scanning happens on your machine.
+- **Secure Key Storage** — API keys are stored in VS Code's global settings, never transmitted to Carto.
+- **Sensitive File Detection** — `.env`, `*.pem`, SSH keys, credential files, and API key files are flagged and excluded by default.
+- **Offline Mode** — Use Ollama for 100% local AI analysis with no external requests.
 
 ---
 
 ## Requirements
 
-- **Visual Studio Code:** Version 1.118.0 or higher.
-- **Ollama (Optional):** To use the Ollama provider, you must have Ollama installed and running on your local machine or an accessible network endpoint.
+- VS Code **1.118.0** or higher
+- Ollama (optional, for local models)
 
 ---
 
 <div align="center">
   <br>
-  <p>Licensed under the <a href="https://opensource.org/licenses/MIT">MIT License</a>.</p>
+  <p>Built with ❤️ by <a href="https://github.com/IamNishant51">Nishant Unavane</a> · <a href="LICENSE">MIT License</a></p>
 </div>
